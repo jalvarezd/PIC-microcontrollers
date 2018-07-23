@@ -1,0 +1,17 @@
+## Stimulus Control File: Do not edit!!
+## VERSION: 3.00.00.00
+## FORMAT:  v1.00.00
+## DEVICE:  PIC16F871
+
+## SCLFILE
+
+
+## ASYNCH
+Pin
+RB0
+Toggle
+
+
+-1
+--
+&

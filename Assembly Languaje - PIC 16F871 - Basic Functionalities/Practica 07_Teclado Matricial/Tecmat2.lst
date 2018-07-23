@@ -1,0 +1,753 @@
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001         list p=16f871
+                      00002         #include <p16f871.inc>
+                      00001         LIST
+                      00002 ; P16F871.INC  Standard Header File, Version 1.00    Microchip Technology, Inc.
+                      00306         LIST
+                      00003 ;Práct 06 (EJEMPLO) "Lectura de Teclado Matricial y Visualización en Display de 7 Segmentos"
+                      00004 ;DISPLAYS: Ánodo Común.
+                      00005 ;DESCRIPCIÓN: Se visualizarán los caracteres leídos desde un Teclado Matricial de 4 X 4 teclas.
+                      00006 ;Los caracteres se visualizarán rotándolos de izquierda a derecha.
+                      00007 ;_______________________________________________________________________________________________________
+                            ___
+                      00008 ;PARTE EVALUATIVA: Adicionar a esta aplicación la posibilidad de Identificar si un grupo de 6 caracteres
+                             ingresados
+                      00009 ;resulta correcto o NO; con el objetivo de implementar la Lectura y Validación de Códigos en Alarmas o
+                      00010 ;cualquier otra aplicación que utilice CONTRASEÑAS.
+                      00011 ;_______________________________________________________________________________________________________
+                            ___
+                      00012 ;FUNCIONA PARA LA SIGUIENTE CONEXIÓN DE HARDWARE.
+                      00013 ;HARDWARE:
+                      00014 ;Teclado Matricial:     rb7 ..rb4 son Columnas, se programan como ENTRADAS.
+                      00015                         ;rb3 ... rb0 son Filas, se programan como       SALIDAS.
+                      00016 ;Resto del HW: Idéntico a los ejemplos anteriores.
+                      00017 
+                      00018 
+                      00019 ;=============================================================================================
+                      00020 ;ZONA DE DECLARACIÓN DE SÍMBOLOS Y VARIABLES.
+                      00021 ;=============================================================================================
+                      00022 ;buffers de las lamparas. Aquí se almacena el dato que deberá visualizarse en
+                      00023 ;los displays (l1 ... l6); que en este caso serán las seis últimas teclas pulsadas.
+                      00024 
+  00000020            00025 l1              equ     0x20
+  00000021            00026 l2              equ     0x21
+  00000022            00027 l3              equ     0x22
+  00000023            00028 l4              equ     0x23
+  00000024            00029 l5              equ     0x24
+  00000025            00030 l6              equ     0x25
+                      00031 
+                      00032 ;variables generales
+                      00033 
+  00000026            00034 nlamp           equ     0x26    ;número de la lámpara que esta siendo refrescada
+  00000027            00035 wtemp           equ     0x27    ;respaldo ac.
+  00000028            00036 fsr_temp        equ     0x28    ;respaldo temporal del FSR.
+  00000029            00037 stat_temp       equ     0x29    ;variable para respaldar el registro STATUS durante la interrupción.
+                      00038 
+                      00039 ;contadores para demora
+  0000002A            00040 cont1           equ     0x2a    ;contadores para demora
+  0000002B            00041 cont2           equ     0x2b
+  0000002C            00042 cont3           equ     0x2c
+                      00043 
+                      00044 ;parámetros para demora
+                      00045 
+  0000002D            00046 N               equ     0x2d    ;factores de demora
+  0000002E            00047 M               equ     0x2e    
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00048 
+                      00049 ;otras variables
+                      00050 
+  0000002F            00051 temp            equ     0x2f    ;varible temporal auxiliar.
+                      00052 
+                      00053 ;variables asociadas a la subrutina de teclado
+  00000031            00054 tecla           equ     0x31
+  00000032            00055 k_flag          equ     0x32
+                      00056 
+                      00057 
+                      00058 ;=============================================================================================
+                      00059 ;Definición de Vectores (Reset e Interrupción).
+                      00060 ;=============================================================================================
+                      00061 
+0000                  00062                         org 0
+0000   2805           00063                         goto inicio     ;vector de RESET.
+0004                  00064                         org 4
+0004   2837           00065                         goto IT ;vector de IT.
+                      00066 ;=============================================================================================
+                      00067 ;Bloque de Configuración del Hardware.
+                      00068 ;=============================================================================================
+0005   1283           00069 inicio                          bcf 3,5
+0006   1303           00070                         bcf 3,6 ;banco 0
+                      00071                         ;===========================================================
+                      00072                         ;BLOQUE QUE DEFINE LAS CONDICIONES INICIALES DEL SISTEMA
+                      00073                         ;===========================================================
+                      00074                         ;inicia parámetros relativos a lamparas         
+                      00075 
+0007   01A6           00076                         clrf nlamp      ;inicia el contador de lámparas (nlamp) en la primera (l1)
+                      00077 
+                      00078                         ;carga valores de N y M para garantizar una demora de 150.86 ms Aproximadamente
+                      00079                         ;que es un tiempo ideal para eliminar rebotes.
+                      00080 
+0008   3064           00081                         movlw d'100'
+0009   00AE           00082                         movwf M
+000A   302C           00083                         movlw d'44'
+000B   00AD           00084                         movwf N
+                      00085                         
+                      00086                         ;-------------------------------------------------------------------------------
+                            ------------------------------------    
+                      00087                         ;definicion de E/S
+                      00088                         ;modifica los registros TRIS (banco 1 de la RAM)
+                      00089 
+000C   1683           00090                         bsf 3,5                 ;banco 1
+                      00091 
+000D   0188           00092                         clrf 8                  ;Bus de Datos
+000E   0189           00093                         clrf 9                  ;Puerto E salidas
+000F   30C7           00094                         movlw b'11000111'       ;rc3, rc4 y rc5 salidas
+0010   0087           00095                         movwf 7
+0011   30F0           00096                         movlw 0xf0
+0012   0086           00097                         movwf 6         ;rb7 ... rb4 entradas (columnas). rb0 ... rb3 salidas (filas).
+                      00098 
+                      00099                         ;-------------------------------------------------------------------------------
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                            ------------------------------------    
+                      00100                         ;definición de líneas digitales
+                      00101         
+0013   3007           00102                         movlw 7         ;líneas del Puerto E DIGITALES
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0014   009F           00103                         movwf ADCON1
+                      00104                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+                      00105                         ;definición de parámetros para el tmr0
+                      00106                         ;tmr0 en modo timer, con pscaler / 64
+                      00107                         ;Ciclo de instrucción=0.25 US
+                      00108                         ;pull ups habilitado.
+                      00109 
+0015   3004           00110                         movlw 4                 ;00000100, prescaler k = 4
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0016   0081           00111                         movwf OPTION_REG
+                      00112 
+                      00113                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+                      00114                         ;habilitación de la interrupción del tmr0 y Interrupciones Globales deshabilitad
+                            as
+                      00115                         ;(GIE = 0, T0IE = 0) por el momento.
+                      00116 
+0017   3020           00117                         movlw b'00100000'       ;11100000
+0018   008B           00118                         movwf 0x0b              ;int del tmr0 habilitada
+                      00119                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+0019   1283           00120                         bcf 3,5
+                      00121         
+                      00122 ;=============================================================================================
+                      00123 ;BLOQUE PRINCIPAL (PROGRAMA PRINCIPAL)
+                      00124 ;=============================================================================================
+                      00125 
+001A   0181           00126                         clrf TMR0               ;inicia timer 0.
+                      00127                         
+001B   178B           00128                         bsf INTCON,7    ;habilita todas las interrupciones.
+                      00129 
+                      00130                         ;Valor Inicial del Contador en BCD:  000 000
+                      00131 
+001C   3010           00132                         movlw d'16'     ;Caracter de NO tecla "-"
+001D   00A0           00133                         movwf l1
+001E   00A1           00134                         movwf l2
+001F   00A2           00135                         movwf l3
+0020   00A3           00136                         movwf l4
+0021   00A4           00137                         movwf l5
+0022   00A5           00138                         movwf l6
+                      00139 
+                      00140                         ;-------------------------------------------------------------------------------
+                            ---------                       
+                      00141                         ;testea teclado matricial
+                      00142                         ;la tecla pulsada se almacena en la variable "tecla" en formato
+                      00143                         ;HEXADECIMAL
+                      00144                         
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0023   209D           00145 test                    call teclado
+0024   1C32           00146                         btfss k_flag,0
+0025   2823           00147                         goto test               ;no hubo tecla pulsada (key = 00000000)
+                      00148                                         ; seguir testeando
+                      00149 
+                      00150                         ;-------------------------------------------------------------------------------
+                            ---------
+                      00151                         ;tecla pulsada: rotar la información en las lámparas
+                      00152                         ;y visualizar la tecla actual en "l6".
+                      00153                         ;ROTAR LA INFORMACIÓN, antes de actualizar l6.
+                      00154 
+0026   0821           00155                         movf l2,w
+0027   00A0           00156                         movwf l1
+0028   0822           00157                         movf l3,w
+0029   00A1           00158                         movwf l2
+002A   0823           00159                         movf l4,w
+002B   00A2           00160                         movwf l3
+002C   0824           00161                         movf l5,w
+002D   00A3           00162                         movwf l4
+002E   0825           00163                         movf l6,w
+002F   00A4           00164                         movwf l5
+                      00165                         ;-------------------------------------------------------------------------------
+                            ---------                       
+                      00166                         ;actualiza l6
+0030   0831           00167                         movf tecla,w
+0031   00A5           00168                         movwf l6
+                      00169                         ;-------------------------------------------------------------------------------
+                            ---------               
+                      00170                         ;Espera a que suelte la tecla
+0032   209D           00171 wait                    call teclado
+0033   1832           00172                         btfsc k_flag,0
+0034   2832           00173                         goto wait
+                      00174                         ;-------------------------------------------------------------------------------
+                            ---------               
+0035   207B           00175                         call demora             ;demora anti rebote
+0036   2823           00176                         goto test
+                      00177 
+                      00178 ;FIN DEL PROGRAMA PRINCIPAL
+                      00179 ;============================================================================           
+                      00180 ;BLOQUE DE SUBRUTINAS
+                      00181 ;============================================================================
+                      00182 ;*******************************************************************************************************
+                            ****************
+                      00183 ;subrutina de Atención a Interrupción. Este caso incluye la decodificación de BCD a 7 segmentos
+                      00184 ;Atención al timer0, cada vez que se desborda; para refrescar el display cada 1ms.
+                      00185 ;*******************************************************************************************************
+                            ****************
+0037                  00186 IT              ;---------------------------------------------------------------------------------------
+                            ------------------      
+                      00187                 ;respaldo de registros.
+                      00188 
+0037   00A7           00189                 movwf wtemp     ;respaldo acumulador.
+0038   0E03           00190                 swapf STATUS,w
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0039   00A9           00191                 movwf stat_temp ;respaldo del STATUS
+003A   0804           00192                 movf FSR,0
+003B   00A8           00193                 movwf fsr_temp  ;respaldo del FSR
+                      00194                 
+                      00195                 ;---------------------------------------------------------------------------------------
+                            ------------------      
+                      00196                 ;encuesta de banderas. 
+                      00197 
+003C   1D0B           00198                 btfss INTCON,2  ;T0IF =? 0
+003D   286C           00199                 goto back_t0    ;refresca el display
+                      00200 
+                      00201                 ;INT del timer 0: Rfrescar display.
+                      00202                 ;apaga lámparas al inicio.
+                      00203                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00204                 ;apaga comunes del puerto C
+003E   1587           00205 refresh         bsf PORTC,3
+003F   1607           00206                 bsf PORTC,4
+0040   1687           00207                 bsf PORTC,5
+                      00208                 ;apaga comunes del puerto E
+0041   30FF           00209                 movlw 0xff
+0042   0089           00210                 movwf 9
+                      00211 
+                      00212                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00213                 ;inicia el FSR  
+                      00214 
+0043   3020           00215                 movlw 0x20
+0044   0084           00216                 movwf FSR
+                      00217 
+                      00218                 ;chequea puerto de comunes (C ó E), en función de nlamp
+                      00219                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00220                 ;nlamp >= 2?
+                      00221 
+0045   0826           00222                 movf nlamp,0
+0046   3C02           00223                 sublw 2
+0047   1903           00224                 btfsc 3,2
+0048   284B           00225                 goto menor              ;nlamp = 2
+0049   1C03           00226                 btfss 3,0               ;pregunta por carry, es >< 2
+004A   2856           00227                 goto mayor_2
+                      00228 
+                      00229                 ;carry = 1 ==> nlamp = < 2
+                      00230 
+004B   0826           00231 menor           movf nlamp,0
+004C   2074           00232                 call cod_act
+004D   3907           00233                 andlw 7                 ;máscara para eliminar puerto E
+004E   00AF           00234                 movwf temp
+004F   1003           00235                 bcf 3,0                 ;limpia carry antes de rotar
+Message[305]: Using default destination of 1 (file).
+0050   0DAF           00236                 rlf temp
+Message[305]: Using default destination of 1 (file).
+0051   0DAF           00237                 rlf temp
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+Message[305]: Using default destination of 1 (file).
+0052   0DAF           00238                 rlf temp                ;rota izq
+                      00239 
+                      00240                 ;trucaje para no afectar dato
+                      00241 
+0053   082F           00242                 movf temp,0             ;leo cod act
+0054   0587           00243                 andwf 7,1               ;sumo para no afectar
+0055   2860           00244                 goto dato
+                      00245 
+                      00246                 ;carry = 1 nlamp > 2
+                      00247 
+0056   0826           00248 mayor_2         movf nlamp,0
+0057   2074           00249                 call cod_act
+0058   01AF           00250                 clrf temp
+0059   00AF           00251                 movwf temp              ;respalda valor
+005A   1003           00252                 bcf 3,0                 ;limpia carry antes de rotar
+Message[305]: Using default destination of 1 (file).
+005B   0CAF           00253                 rrf temp
+Message[305]: Using default destination of 1 (file).
+005C   0CAF           00254                 rrf temp
+Message[305]: Using default destination of 1 (file).
+005D   0CAF           00255                 rrf temp
+005E   082F           00256                 movf temp,w             ;cod act al acum.
+005F   0089           00257                 movwf 9                 ;cod. de act al puerto E
+                      00258                 ;sacar el dato para la lámpara nlamp
+                      00259 
+0060   0826           00260 dato            movf nlamp,w
+0061   0784           00261                 addwf FSR,1                     
+0062   0800           00262                 movf INDF,0
+0063   208B           00263                 call cod_ss
+0064   0088           00264                 movwf 8                 ;se saca directamente el dato
+                      00265                                         ;la tabla "cod_ss" está codificada
+                      00266                                         ;para Ánodo Común
+                      00267 
+                      00268                 ;próxima  lámpara
+                      00269 
+0065   0826           00270                 movf nlamp,w
+0066   3C05           00271                 sublw 5
+0067   1D03           00272                 btfss 3,2
+0068   286B           00273                 goto menor_5
+                      00274 
+                      00275                 ;nlamp = 0
+                      00276 
+0069   01A6           00277                 clrf nlamp
+006A   286C           00278                 goto back_t0
+                      00279                 
+                      00280                 ;nlamp < 5
+                      00281 
+Message[305]: Using default destination of 1 (file).
+006B   0AA6           00282 menor_5         incf nlamp
+                      00283 
+006C   110B           00284 back_t0         bcf INTCON,2    ;limpia la bandera del timer0
+                      00285 
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+006D   0828           00286 back            movf fsr_temp,w
+006E   0084           00287                 movwf FSR               ;restituye FSR
+006F   0E29           00288                 swapf stat_temp,w
+0070   0083           00289                 movwf STATUS    ;restituye STATUS
+0071   0EA7           00290                 swapf wtemp,f
+0072   0E27           00291                 swapf wtemp,w   ;restituye W sin afectar las banderas del STATUS.
+                      00292                                                         ;la instrucción "swapf   f ", no afecta el conte
+                            nido del STATUS                 
+0073   0009           00293                 retfie                  ;retorno de la subrutina.
+                      00294 
+                      00295 ;*******************************************************************************************************
+                            ****************
+                      00296 ;tabla de códigos de activación (ánodo común)
+                      00297 
+0074   0782           00298 cod_act addwf PCL,1             ;suma el offset al acum.
+0075   34FE           00299                 retlw b'11111110'
+0076   34FD           00300                 retlw b'11111101'
+0077   34FB           00301                 retlw b'11111011'
+0078   34F7           00302                 retlw b'11110111'
+0079   34EF           00303                 retlw b'11101111'
+007A   34DF           00304                 retlw b'11011111'
+                      00305 
+                      00306 ;*******************************************************************************************************
+                            ****************
+                      00307 ;subrutina de DEMORA paramétrica general
+                      00308 ;*******************************************************************************************************
+                            ****************
+007B                  00309 demora          ;return
+007B   082D           00310                 movf N,w
+007C   00AA           00311                 movwf cont1
+007D   00AB           00312                 movwf cont2
+007E   082E           00313                 movf M,w
+007F   00AC           00314                 movwf cont3
+Message[305]: Using default destination of 1 (file).
+0080   0BAA           00315 loop            decfsz cont1
+0081   2880           00316                 goto loop
+0082   082D           00317                 movf N,w
+0083   00AA           00318                 movwf cont1
+Message[305]: Using default destination of 1 (file).
+0084   0BAB           00319                 decfsz cont2
+0085   2880           00320                 goto loop
+0086   082D           00321                 movf N,w
+0087   00AB           00322                 movwf cont2
+Message[305]: Using default destination of 1 (file).
+0088   0BAC           00323                 decfsz cont3
+0089   2880           00324                 goto loop
+                      00325                 ;fin del proceso
+008A   0008           00326                 return
+                      00327 ;**************************************************************************************************
+                      00328 ;tabla de caracteres 7 segmentos para decodificar un teclado matricial (como el que utiliza el KIT).
+                      00329 ;Códigos para Anodo Común.
+                      00330 
+008B   0782           00331 cod_ss          addwf   PCL,1
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+008C   34F9           00332                 retlw   0xf9                    ;"1"
+008D   34A4           00333                 retlw   0xa4                    ;"2"
+008E   34B0           00334                 retlw   0xb0                    ;"3"
+008F   3488           00335                 retlw   0x88                    ;"A"
+0090   3499           00336                 retlw   0x99                    ;"4"
+0091   3492           00337                 retlw   0x92                    ;"5"
+0092   3482           00338                 retlw   0x82                    ;"6"
+0093   3483           00339                 retlw   0x83                    ;"B"
+0094   34B8           00340                 retlw   0xb8                    ;"7"
+0095   3480           00341                 retlw   0x80                    ;"8"
+0096   3498           00342                 retlw   0x98                    ;"9"
+0097   34C6           00343                 retlw   0xc6                    ;"C"
+0098   349C           00344                 retlw   0x9c                    ;"*"
+0099   34C0           00345                 retlw   0xc0                    ;"0"
+009A   34A3           00346                 retlw   0xa3                    ;"#"
+009B   34A1           00347                 retlw   0xa1                    ;"D"
+009C   34BF           00348                 retlw   0xbf                    ;"-", no tecla
+                      00349 ;===========================================================
+                      00350                 ;subrutina que ESCANEA un Teclado Matricial de 4 X 4 teclas.
+                      00351 
+009D   01B1           00352 teclado         clrf    tecla           ;esquina sup izquierda
+009E   01B2           00353                 clrf    k_flag          ;no tecla
+009F   30F7           00354                 movlw b'11110111'               ;patron inicial de filas
+00A0   0086           00355                 movwf 6
+                      00356                 ;columnas rb7 .... rb4
+00A1   1F86           00357 scancol btfss   6,7
+00A2   28B3           00358                 goto sitecla
+Message[305]: Using default destination of 1 (file).
+00A3   0AB1           00359                 incf    tecla
+00A4   1F06           00360                 btfss   6,6
+00A5   28B3           00361                 goto sitecla
+Message[305]: Using default destination of 1 (file).
+00A6   0AB1           00362                 incf    tecla
+00A7   1E86           00363                 btfss   6,5
+00A8   28B3           00364                 goto sitecla
+Message[305]: Using default destination of 1 (file).
+00A9   0AB1           00365                 incf    tecla
+00AA   1E06           00366                 btfss   6,4
+00AB   28B3           00367                 goto sitecla
+Message[305]: Using default destination of 1 (file).
+00AC   0AB1           00368                 incf    tecla
+                      00369                 ;pregunto si estoy testeando la última tecla
+00AD   0831           00370                 movf    tecla,w
+00AE   3C10           00371                 sublw   d'16'
+00AF   1D03           00372                 btfss   3,2
+00B0   28B5           00373                 goto    next
+                      00374                 ;sí, es la última
+00B1   1032           00375                 bcf     k_flag,0                ;indico que no hubo tecla
+00B2   0008           00376                 return
+00B3   1432           00377 sitecla         bsf     k_flag,0                ;indico que hubo tecla
+00B4   0008           00378                 return
+00B5                  00379 next            ;pasar a la próxima fila
+00B5   1403           00380                 bsf     3,0             ;setea acarreo
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+Message[305]: Using default destination of 1 (file).
+00B6   0C86           00381                 rrf     6
+00B7   28A1           00382                 goto scancol
+                      00383 
+                      00384 
+                      00385                 
+                      00386                 end
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE 10
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCS0                             00000006
+ADCS1                             00000007
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+BRGH                              00000002
+C                                 00000000
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CREN                              00000004
+CSRC                              00000007
+DC                                00000001
+EEADR                             0000010D
+EEADRH                            0000010F
+EECON1                            0000018C
+EECON2                            0000018D
+EEDATA                            0000010C
+EEDATH                            0000010E
+EEIE                              00000004
+EEIF                              00000004
+EEPGD                             00000007
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+IBF                               00000007
+IBOV                              00000005
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE 11
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+IT                                00000037
+M                                 0000002E
+N                                 0000002D
+NOT_BO                            00000000
+NOT_BOR                           00000000
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+PCFG0                             00000000
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+RBIE                              00000003
+RBIF                              00000000
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE 12
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+RX9                               00000006
+RX9D                              00000000
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+STATUS                            00000003
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISB                             00000086
+TRISC                             00000087
+TRISD                             00000088
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRMT                              00000001
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE 13
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+W                                 00000000
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_ALL                           00000FCF
+_CP_OFF                           00003FFF
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_HS_OSC                           00003FFE
+_LP_OSC                           00003FFC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_WRT_ENABLE_OFF                   00003DFF
+_WRT_ENABLE_ON                    00003FFF
+_XT_OSC                           00003FFD
+__16F871                          00000001
+back                              0000006D
+back_t0                           0000006C
+cod_act                           00000074
+cod_ss                            0000008B
+cont1                             0000002A
+cont2                             0000002B
+cont3                             0000002C
+dato                              00000060
+demora                            0000007B
+fsr_temp                          00000028
+inicio                            00000005
+k_flag                            00000032
+l1                                00000020
+l2                                00000021
+l3                                00000022
+l4                                00000023
+l5                                00000024
+l6                                00000025
+loop                              00000080
+mayor_2                           00000056
+menor                             0000004B
+menor_5                           0000006B
+next                              000000B5
+nlamp                             00000026
+refresh                           0000003E
+scancol                           000000A1
+sitecla                           000000B3
+MPASM 03.90 Released                              TECMAT2.ASM   11-29-2007  18:01:06         PAGE 14
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+stat_temp                         00000029
+tecla                             00000031
+teclado                           0000009D
+temp                              0000002F
+test                              00000023
+wait                              00000032
+wtemp                             00000027
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : X---XXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXX--------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   181
+Program Memory Words Free:  1867
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :    17 reported,     0 suppressed
+
+

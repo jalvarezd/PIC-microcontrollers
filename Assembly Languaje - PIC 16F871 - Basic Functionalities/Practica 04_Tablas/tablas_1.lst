@@ -1,0 +1,646 @@
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001                 list p = 16f877
+                      00002                 #include "p16f877.inc"
+                      00001         LIST
+                      00002 ; P16F877.INC  Standard Header File, Version 1.00    Microchip Technology, Inc.
+                      00373         LIST
+                      00003                 ;definición de variables auxiliares
+                      00004 
+  00000020            00005 indice          = 0x20
+  00000021            00006 valor_out       = 0x21
+                      00007 
+                      00008                 ;condiciones iniciales
+                      00009 
+0000   01A0           00010                 clrf indice     ;inidice = 00
+                      00011 
+                      00012                 ;Ejemplo ilustrativo # 1 de utilización de creación y utilización de una tabla
+                      00013                 ;____________________________________________________________________________
+                      00014                 
+                      00015 
+0001                  00016 inicio          ;carga PCLATH = 09
+0001   3004           00017                 movlw 4
+0002   008A           00018                 movwf PCLATH
+                      00019 
+                      00020                 ;carga indice en W
+                      00021 
+0003   0820           00022                 movf    indice,w
+0004   2400           00023                 call tabla
+0005   00A1           00024                 movwf valor_out
+0006   018A           00025                 clrf PCLATH
+                      00026                 ;chequea indice máximo
+0007   0820           00027                 movf indice,w
+0008   3CFA           00028                 sublw d'250'
+0009   1903           00029                 btfsc 3,2
+000A   280D           00030                 goto fin_tabla
+Message[305]: Using default destination of 1 (file).
+000B   0AA0           00031                 incf indice
+000C   2801           00032                 goto inicio
+                      00033                 ;sacados todos los valores
+000D   01A0           00034 fin_tabla       clrf indice
+000E   2801           00035                 goto inicio
+                      00036 
+                      00037 ;=================================================================================
+0400                  00038                 org 0x400               ;inicio de la tabla en la 0x400
+                      00039 ;=========================================================================
+                      00040 ;TABLA DE CALIBRACIÓN CONDUCTIVIDAD SONDA 1
+                      00041 ;=========================================================================
+0400   0782           00042 tabla           addwf PCL,1
+0401   3400           00043                 retlw 0
+0402   3401           00044                 retlw 1
+0403   3402           00045                 retlw 2
+0404   3403           00046                 retlw 3
+0405   3404           00047                 retlw 4
+0406   3405           00048                 retlw 5
+0407   3406           00049                 retlw 6
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0408   3407           00050                 retlw 7
+0409   3408           00051                 retlw 8
+040A   3409           00052                 retlw 9
+040B   340A           00053                 retlw d'10'
+040C   340B           00054                 retlw d'11'
+040D   340C           00055                 retlw d'12'
+040E   340D           00056                 retlw d'13'
+040F   340E           00057                 retlw d'14'
+0410   340F           00058                 retlw d'15'
+0411   3410           00059                 retlw d'16'
+0412   3411           00060                 retlw d'17'
+0413   3412           00061                 retlw d'18'
+0414   3413           00062                 retlw d'19'
+0415   3414           00063                 retlw d'20'
+0416   3415           00064                 retlw d'21'
+0417   3416           00065                 retlw d'22'
+0418   3417           00066                 retlw d'23'
+0419   3418           00067                 retlw d'24'
+                      00068 ;---------------- 25 valores -------------------------------
+041A   3400           00069                 retlw 0
+041B   3401           00070                 retlw 1
+041C   3402           00071                 retlw 2
+041D   3403           00072                 retlw 3
+041E   3404           00073                 retlw 4
+041F   3405           00074                 retlw 5
+0420   3406           00075                 retlw 6
+0421   3407           00076                 retlw 7
+0422   3408           00077                 retlw 8
+0423   3409           00078                 retlw 9
+0424   340A           00079                 retlw d'10'
+0425   340B           00080                 retlw d'11'
+0426   340C           00081                 retlw d'12'
+0427   340D           00082                 retlw d'13'
+0428   340E           00083                 retlw d'14'
+0429   340F           00084                 retlw d'15'
+042A   3410           00085                 retlw d'16'
+042B   3411           00086                 retlw d'17'
+042C   3412           00087                 retlw d'18'
+042D   3413           00088                 retlw d'19'
+042E   3414           00089                 retlw d'20'
+042F   3415           00090                 retlw d'21'
+0430   3416           00091                 retlw d'22'
+0431   3417           00092                 retlw d'23'
+0432   3418           00093                 retlw d'24'
+                      00094 ;---------------- 50 valores -------------------------------
+0433   3400           00095                 retlw 0
+0434   3401           00096                 retlw 1
+0435   3402           00097                 retlw 2
+0436   3403           00098                 retlw 3
+0437   3404           00099                 retlw 4
+0438   3405           00100                 retlw 5
+0439   3406           00101                 retlw 6
+043A   3407           00102                 retlw 7
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+043B   3408           00103                 retlw 8
+043C   3409           00104                 retlw 9
+043D   340A           00105                 retlw d'10'
+043E   340B           00106                 retlw d'11'
+043F   340C           00107                 retlw d'12'
+0440   340D           00108                 retlw d'13'
+0441   340E           00109                 retlw d'14'
+0442   340F           00110                 retlw d'15'
+0443   3410           00111                 retlw d'16'
+0444   3411           00112                 retlw d'17'
+0445   3412           00113                 retlw d'18'
+0446   3413           00114                 retlw d'19'
+0447   3414           00115                 retlw d'20'
+0448   3415           00116                 retlw d'21'
+0449   3416           00117                 retlw d'22'
+044A   3417           00118                 retlw d'23'
+044B   3418           00119                 retlw d'24'
+                      00120 ;---------------- 75 valores -------------------------------
+044C   3400           00121                 retlw 0
+044D   3401           00122                 retlw 1
+044E   3402           00123                 retlw 2
+044F   3403           00124                 retlw 3
+0450   3404           00125                 retlw 4
+0451   3405           00126                 retlw 5
+0452   3406           00127                 retlw 6
+0453   3407           00128                 retlw 7
+0454   3408           00129                 retlw 8
+0455   3409           00130                 retlw 9
+0456   340A           00131                 retlw d'10'
+0457   340B           00132                 retlw d'11'
+0458   340C           00133                 retlw d'12'
+0459   340D           00134                 retlw d'13'
+045A   340E           00135                 retlw d'14'
+045B   340F           00136                 retlw d'15'
+045C   3410           00137                 retlw d'16'
+045D   3411           00138                 retlw d'17'
+045E   3412           00139                 retlw d'18'
+045F   3413           00140                 retlw d'19'
+0460   3414           00141                 retlw d'20'
+0461   3415           00142                 retlw d'21'
+0462   3416           00143                 retlw d'22'
+0463   3417           00144                 retlw d'23'
+0464   3418           00145                 retlw d'24'
+                      00146 ;---------------- 100 valores -------------------------------
+0465   3400           00147                 retlw 0
+0466   3401           00148                 retlw 1
+0467   3402           00149                 retlw 2
+0468   3403           00150                 retlw 3
+0469   3404           00151                 retlw 4
+046A   3405           00152                 retlw 5
+046B   3406           00153                 retlw 6
+046C   3407           00154                 retlw 7
+046D   3408           00155                 retlw 8
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+046E   3409           00156                 retlw 9
+046F   340A           00157                 retlw d'10'
+0470   340B           00158                 retlw d'11'
+0471   340C           00159                 retlw d'12'
+0472   340D           00160                 retlw d'13'
+0473   340E           00161                 retlw d'14'
+0474   340F           00162                 retlw d'15'
+0475   3410           00163                 retlw d'16'
+0476   3411           00164                 retlw d'17'
+0477   3412           00165                 retlw d'18'
+0478   3413           00166                 retlw d'19'
+0479   3414           00167                 retlw d'20'
+047A   3415           00168                 retlw d'21'
+047B   3416           00169                 retlw d'22'
+047C   3417           00170                 retlw d'23'
+047D   3418           00171                 retlw d'24'
+                      00172 ;---------------- 125 valores -------------------------------
+047E   3400           00173                 retlw 0
+047F   3401           00174                 retlw 1
+0480   3402           00175                 retlw 2
+0481   3403           00176                 retlw 3
+0482   3404           00177                 retlw 4
+0483   3405           00178                 retlw 5
+0484   3406           00179                 retlw 6
+0485   3407           00180                 retlw 7
+0486   3408           00181                 retlw 8
+0487   3409           00182                 retlw 9
+0488   340A           00183                 retlw d'10'
+0489   340B           00184                 retlw d'11'
+048A   340C           00185                 retlw d'12'
+048B   340D           00186                 retlw d'13'
+048C   340E           00187                 retlw d'14'
+048D   340F           00188                 retlw d'15'
+048E   3410           00189                 retlw d'16'
+048F   3411           00190                 retlw d'17'
+0490   3412           00191                 retlw d'18'
+0491   3413           00192                 retlw d'19'
+0492   3414           00193                 retlw d'20'
+0493   3415           00194                 retlw d'21'
+0494   3416           00195                 retlw d'22'
+0495   3417           00196                 retlw d'23'
+0496   3418           00197                 retlw d'24'
+                      00198 ;---------------- 150 valores -------------------------------
+0497   3400           00199                 retlw 0
+0498   3401           00200                 retlw 1
+0499   3402           00201                 retlw 2
+049A   3403           00202                 retlw 3
+049B   3404           00203                 retlw 4
+049C   3405           00204                 retlw 5
+049D   3406           00205                 retlw 6
+049E   3407           00206                 retlw 7
+049F   3408           00207                 retlw 8
+04A0   3409           00208                 retlw 9
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+04A1   340A           00209                 retlw d'10'
+04A2   340B           00210                 retlw d'11'
+04A3   340C           00211                 retlw d'12'
+04A4   340D           00212                 retlw d'13'
+04A5   340E           00213                 retlw d'14'
+04A6   340F           00214                 retlw d'15'
+04A7   3410           00215                 retlw d'16'
+04A8   3411           00216                 retlw d'17'
+04A9   3412           00217                 retlw d'18'
+04AA   3413           00218                 retlw d'19'
+04AB   3414           00219                 retlw d'20'
+04AC   3415           00220                 retlw d'21'
+04AD   3416           00221                 retlw d'22'
+04AE   3417           00222                 retlw d'23'
+04AF   3418           00223                 retlw d'24'
+                      00224 ;---------------- 175 valores -------------------------------
+04B0   3400           00225                 retlw 0
+04B1   3401           00226                 retlw 1
+04B2   3402           00227                 retlw 2
+04B3   3403           00228                 retlw 3
+04B4   3404           00229                 retlw 4
+04B5   3405           00230                 retlw 5
+04B6   3406           00231                 retlw 6
+04B7   3407           00232                 retlw 7
+04B8   3408           00233                 retlw 8
+04B9   3409           00234                 retlw 9
+04BA   340A           00235                 retlw d'10'
+04BB   340B           00236                 retlw d'11'
+04BC   340C           00237                 retlw d'12'
+04BD   340D           00238                 retlw d'13'
+04BE   340E           00239                 retlw d'14'
+04BF   340F           00240                 retlw d'15'
+04C0   3410           00241                 retlw d'16'
+04C1   3411           00242                 retlw d'17'
+04C2   3412           00243                 retlw d'18'
+04C3   3413           00244                 retlw d'19'
+04C4   3414           00245                 retlw d'20'
+04C5   3415           00246                 retlw d'21'
+04C6   3416           00247                 retlw d'22'
+04C7   3417           00248                 retlw d'23'
+04C8   3418           00249                 retlw d'24'
+                      00250 ;---------------- 200 valores -------------------------------
+04C9   3400           00251                 retlw 0
+04CA   3401           00252                 retlw 1
+04CB   3402           00253                 retlw 2
+04CC   3403           00254                 retlw 3
+04CD   3404           00255                 retlw 4
+04CE   3405           00256                 retlw 5
+04CF   3406           00257                 retlw 6
+04D0   3407           00258                 retlw 7
+04D1   3408           00259                 retlw 8
+04D2   3409           00260                 retlw 9
+04D3   340A           00261                 retlw d'10'
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+04D4   340B           00262                 retlw d'11'
+04D5   340C           00263                 retlw d'12'
+04D6   340D           00264                 retlw d'13'
+04D7   340E           00265                 retlw d'14'
+04D8   340F           00266                 retlw d'15'
+04D9   3410           00267                 retlw d'16'
+04DA   3411           00268                 retlw d'17'
+04DB   3412           00269                 retlw d'18'
+04DC   3413           00270                 retlw d'19'
+04DD   3414           00271                 retlw d'20'
+04DE   3415           00272                 retlw d'21'
+04DF   3416           00273                 retlw d'22'
+04E0   3417           00274                 retlw d'23'
+04E1   3418           00275                 retlw d'24'
+                      00276 ;---------------- 225 valores -------------------------------
+04E2   3400           00277                 retlw 0
+04E3   3401           00278                 retlw 1
+04E4   3402           00279                 retlw 2
+04E5   3403           00280                 retlw 3
+04E6   3404           00281                 retlw 4
+04E7   3405           00282                 retlw 5
+04E8   3406           00283                 retlw 6
+04E9   3407           00284                 retlw 7
+04EA   3408           00285                 retlw 8
+04EB   3409           00286                 retlw 9
+04EC   340A           00287                 retlw d'10'
+04ED   340B           00288                 retlw d'11'
+04EE   340C           00289                 retlw d'12'
+04EF   340D           00290                 retlw d'13'
+04F0   340E           00291                 retlw d'14'
+04F1   340F           00292                 retlw d'15'
+04F2   3410           00293                 retlw d'16'
+04F3   3411           00294                 retlw d'17'
+04F4   3412           00295                 retlw d'18'
+04F5   3413           00296                 retlw d'19'
+04F6   3414           00297                 retlw d'20'
+04F7   3415           00298                 retlw d'21'
+04F8   3416           00299                 retlw d'22'
+04F9   3417           00300                 retlw d'23'
+04FA   3418           00301                 retlw d'24'
+                      00302 ;---------------- 250 valores -------------------------------
+                      00303 
+                      00304                 end
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  7
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ACKDT                             00000005
+ACKEN                             00000004
+ACKSTAT                           00000006
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCS0                             00000006
+ADCS1                             00000007
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+BCLIE                             00000003
+BCLIF                             00000003
+BF                                00000000
+BRGH                              00000002
+C                                 00000000
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCP2CON                           0000001D
+CCP2IE                            00000000
+CCP2IF                            00000000
+CCP2M0                            00000000
+CCP2M1                            00000001
+CCP2M2                            00000002
+CCP2M3                            00000003
+CCP2X                             00000005
+CCP2Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CCPR2H                            0000001C
+CCPR2L                            0000001B
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CKE                               00000006
+CKP                               00000004
+CREN                              00000004
+CSRC                              00000007
+D                                 00000005
+DATA_ADDRESS                      00000005
+DC                                00000001
+D_A                               00000005
+EEADR                             0000010D
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  8
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+EEADRH                            0000010F
+EECON1                            0000018C
+EECON2                            0000018D
+EEDATA                            0000010C
+EEDATH                            0000010E
+EEIE                              00000004
+EEIF                              00000004
+EEPGD                             00000007
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GCEN                              00000007
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+I2C_DATA                          00000005
+I2C_READ                          00000002
+I2C_START                         00000003
+I2C_STOP                          00000004
+IBF                               00000007
+IBOV                              00000005
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+NOT_A                             00000005
+NOT_ADDRESS                       00000005
+NOT_BO                            00000000
+NOT_BOR                           00000000
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+NOT_W                             00000002
+NOT_WRITE                         00000002
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+P                                 00000004
+PCFG0                             00000000
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE  9
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+PEN                               00000002
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+R                                 00000002
+RBIE                              00000003
+RBIF                              00000000
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCEN                              00000003
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+READ_WRITE                        00000002
+RP0                               00000005
+RP1                               00000006
+RSEN                              00000001
+RX9                               00000006
+RX9D                              00000000
+R_W                               00000002
+S                                 00000003
+SEN                               00000000
+SMP                               00000007
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+SSPADD                            00000093
+SSPBUF                            00000013
+SSPCON                            00000014
+SSPCON2                           00000091
+SSPEN                             00000005
+SSPIE                             00000003
+SSPIF                             00000003
+SSPM0                             00000000
+SSPM1                             00000001
+SSPM2                             00000002
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE 10
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+SSPM3                             00000003
+SSPOV                             00000006
+SSPSTAT                           00000094
+STATUS                            00000003
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISB                             00000086
+TRISC                             00000087
+TRISD                             00000088
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRMT                              00000001
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+UA                                00000001
+W                                 00000000
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE 11
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+WCOL                              00000007
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_ALL                           00000FCF
+_CP_HALF                          00001FDF
+_CP_OFF                           00003FFF
+_CP_UPPER_256                     00002FEF
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_HS_OSC                           00003FFE
+_LP_OSC                           00003FFC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_WRT_ENABLE_OFF                   00003DFF
+_WRT_ENABLE_ON                    00003FFF
+_XT_OSC                           00003FFD
+__16F877                          00000001
+fin_tabla                         0000000D
+indice                            00000020
+inicio                            00000001
+tabla                             00000400
+valor_out                         00000021
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : XXXXXXXXXXXXXXX- ---------------- ---------------- ----------------
+0400 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0440 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0480 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+04C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXX-----
+
+All other memory blocks unused.
+
+Program Memory Words Used:   266
+Program Memory Words Free:  7926
+
+
+MPASM 03.90 Released                             TABLAS_1.ASM   11-7-2007  15:31:40         PAGE 12
+
+
+
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     1 reported,     0 suppressed
+
+

@@ -1,0 +1,717 @@
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001         list p=16f871
+                      00002         #include <p16f871.inc>
+                      00001         LIST
+                      00002 ; P16F871.INC  Standard Header File, Version 1.00    Microchip Technology, Inc.
+                      00306         LIST
+                      00003 
+                      00004 ;©Ing. Leonel Pérez R. ISSBN 010234
+                      00005 ;Práctica 04 "CONTADOR ASCENDENTE".
+                      00006 ;Este es un ejemplo de utilización de interrupciones. En la interrupción que produce el
+                      00007 ;Timer 0 cada 1ms se produce el refrescamiento.
+                      00008 ;DISPLAYS: Ánodo Común.
+                      00009 ;Práctica Evaluativa: Convertir esta Aplicación en un CONTADOR DE 6 DÍGITOS ASCENDENTE 
+                      00010 ;- DESCENDENTE.
+                      00011 
+                      00012 ;=============================================================================================
+                      00013 ;ZONA DE DECLARACIÓN DE SÍMBOLOS Y VARIABLES.
+                      00014 ;=============================================================================================
+                      00015 ;Definición de la RAM de Display (L1 ... L6). En estas localizaciones se almacenará el dato que 
+                      00016 ;deberá visualizarse en los displays (L1 ... L6) que en este caso es el conteo en BCD del contador 
+                      00017 
+  00000020            00018 l1              equ     0x20
+  00000021            00019 l2              equ     0x21
+  00000022            00020 l3              equ     0x22
+  00000023            00021 l4              equ     0x23
+  00000024            00022 l5              equ     0x24
+  00000025            00023 l6              equ     0x25
+                      00024 
+                      00025 ;variables generales
+                      00026 
+  00000026            00027 nlamp           equ     0x26                    ;número de la lámpara que esta siendo refrescada
+  00000027            00028 wtemp           equ     0x27                    ;respaldo del acumulador en la INT.
+  00000028            00029 fsr_temp        equ     0x28                    ;respaldo temporal del FSR.
+  00000029            00030 stat_temp       equ     0x29                    ;variable para respaldar el registro STATUS 
+                      00031                                                 ;durante la interrupción.
+                      00032 ;Contadores para demora paramétrica
+  0000002A            00033 cont1           equ     0x2a    
+  0000002B            00034 cont2           equ     0x2b
+  0000002C            00035 cont3           equ     0x2c
+                      00036 
+                      00037 
+                      00038 ;parametros para fijar el tiempo de la demora
+                      00039 
+  0000002D            00040 N               equ     0x2d    ;factores de demora
+  0000002E            00041 M               equ     0x2e    
+                      00042 
+                      00043 ;otras variables
+                      00044 
+  0000002F            00045 temp            equ     0x2f    ;varible temporal auxiliar.
+                      00046 
+                      00047 ;=============================================================================================
+                      00048 ;Definición de Vectores (Reset e Interrupción).
+                      00049 ;=============================================================================================
+                      00050 
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0000                  00051                         org 0
+0000   2805           00052                         goto inicio     ;vector de RESET.
+0004                  00053                         org 4
+0004   2824           00054                         goto IT         ;vector de INTERRUPCION.
+                      00055 ;=============================================================================================
+                      00056 ;Bloque de Configuración del Hardware.
+                      00057 ;=============================================================================================
+0005   1283           00058 inicio                          bcf 3,5
+0006   1303           00059                         bcf 3,6 ;banco 0
+                      00060                         ;===========================================================================
+                      00061                         ;BLOQUE QUE DEFINE LAS CONDICIONES INICIALES DEL SISTEMA
+                      00062                         ;===========================================================================
+                      00063                         ;inicia parámetros relativos a lamparas         
+                      00064 
+0007   01A6           00065                         clrf nlamp      ;inicia el contador de lámparas (nlamp) en la primera (l1)
+                      00066 
+                      00067                         ;eL CONTEO INICIAL ES 000 000
+0008   3008           00068                         movlw 8
+0009   00A0           00069                         movwf l1
+000A   00A1           00070                         movwf l2
+000B   00A2           00071                         movwf l3
+000C   00A3           00072                         movwf l4
+000D   00A4           00073                         movwf l5
+000E   00A5           00074                         movwf l6
+                      00075 
+                      00076         
+                      00077                         ;-------------------------------------------------------------------------------
+                            ------------------------------------    
+                      00078                         ;definicion de Entradas y Salidas
+                      00079                         ;modifica los registros TRIS (banco 1 de la RAM)
+                      00080 
+000F   1683           00081                         bsf 3,5                 ;banco 1 RAM
+                      00082 
+0010   0188           00083                         clrf 8                  ;Bus de Datos de los displays
+0011   0189           00084                         clrf 9                  ;Puerto E salidas
+0012   30C7           00085                         movlw b'11000111'       ;rc3, rc4 y rc5 salidas
+0013   0087           00086                         movwf 7
+0014   30FF           00087                         movlw 0xff
+0015   0086           00088                         movwf 6         ;Puerto B entrada
+                      00089 
+                      00090                         ;-------------------------------------------------------------------------------
+                            ------------------------------------    
+                      00091                         ;definición de líneas digitales
+                      00092         
+0016   3007           00093                         movlw 7         ;líneas del Puerto E DIGITALES
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0017   009F           00094                         movwf ADCON1
+                      00095                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+                      00096                         ;definición de parámetros para el TMR0 (Temporizador 0)
+                      00097                         ;TMR0 en modo timer, con pscaler / 64
+                      00098                         ;Ciclo de instrucción=0.25 US
+                      00099                         ;PULL UPS habilitados RBPU = 0.
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00100 
+0018   3004           00101                         movlw 4                 ;00000100, prescaler k = 4
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0019   0081           00102                         movwf OPTION_REG
+                      00103 
+                      00104                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+                      00105                         ;habilitación de la interrupción del TMR0 y Interrupciones Globales deshabilitad
+                            as
+                      00106                         ;(GIE = 0, T0IE = 1) por el momento.
+                      00107 
+001A   3020           00108                         movlw b'00100000'               ;11100000
+001B   008B           00109                         movwf 0x0b                      ;int del tmr0 habilitada
+                      00110                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+001C   1283           00111                         bcf 3,5                         ;banco 0 de la RAM
+                      00112         
+                      00113 ;=============================================================================================
+                      00114 ;BLOQUE PRINCIPAL (PROGRAMA PRINCIPAL)
+                      00115 ;=============================================================================================
+                      00116 
+001D   0181           00117                         clrf TMR0               ;inicia timer 0
+                      00118                         
+001E   178B           00119                         bsf INTCON,7            ;habilita todas las interrupciones (sincroniza sistema).
+                      00120 
+                      00121                         ;-------------------------------------------------------------------------------
+                            ---------
+                      00122                         ;testea tecla
+001F   1806           00123 test                    btfsc 6,0
+0020   281F           00124                         goto test               ;tecla inactiva, seguir testeando
+                      00125                         ;-------------------------------------------------------------------------------
+                            ---------
+0021   2073           00126                         call cuenta_up  ;contar
+                      00127                         ;-------------------------------------------------------------------------------
+                            ---------
+                      00128 ;wait                   btfss 6,0               ;espera a que suelte la tecla
+                      00129                         ;goto wait
+0022   2098           00130                         call dem_150ms  ;demora antirebote
+0023   281F           00131                         goto test                       
+                      00132 
+                      00133 ;=============================================================================================
+                      00134 ;BLOQUE DE SUBRUTINAS
+                      00135 ;=============================================================================================
+                      00136 ;subrutina de Atención a Interrupción. Este caso incluye la decodificación de BCD a 7 segmentos
+                      00137 ;Atención al timer0, cada vez que se desborda; para refrescar el display cada 1ms.
+                      00138 ;*******************************************************************************************************
+                            *********************************************
+0024                  00139 IT              ;---------------------------------------------------------------------------------------
+                            --------------------------------------------------------------------------
+                      00140                 ;respaldo de registros. Los registros de mayor USO en el Programa Principal
+                      00141                 ;deben ser respaldados durante la ejecución de una Interrupción para evitar
+                      00142                 ;que pierdan su valor y al retornar al Programa Principal se produzcan errores.
+                      00143                 ;CONSULTE SECCION "SPECIAL FEATURES OF THE CPU" => "INTERRUPTS"
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00144                 ;en PIC16F87X datasheet.
+                      00145 
+0024   00A7           00146                 movwf wtemp             ;respaldo acumulador.
+0025   0E03           00147                 swapf STATUS,w
+0026   00A9           00148                 movwf stat_temp ;respaldo del STATUS
+0027   0804           00149                 movf FSR,0
+0028   00A8           00150                 movwf fsr_temp  ;respaldo del FSR
+                      00151                 
+                      00152                 ;---------------------------------------------------------------------------------------
+                            ------------------      
+                      00153                 ;encuesta de banderas. En este segmento se validan la o las interrupciones
+                      00154                 ;que hayan sido solicitadas.
+                      00155 
+0029   1D0B           00156                 btfss INTCON,2          ;T0IF =? 0
+002A   2859           00157                 goto back_t0            ;regresa de Interrupción, al parecer fue un error
+                      00158 
+                      00159                 ;INT del timer 0: Refrescar Display.
+                      00160                 ;apaga lámparas al inicio.
+                      00161                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00162                 ;apaga comunes del puerto C
+002B   1587           00163 refresh         bsf PORTC,3
+002C   1607           00164                 bsf PORTC,4
+002D   1687           00165                 bsf PORTC,5
+                      00166                 ;apaga comunes del puerto E
+002E   30FF           00167                 movlw 0xff
+002F   0089           00168                 movwf 9
+                      00169 
+                      00170                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00171                 ;inicia el FSR  
+0030   3020           00172                 movlw 0x20
+0031   0084           00173                 movwf FSR
+                      00174 
+                      00175                 ;chequea en que PUERTO (C ó E) está el común que debe activarse
+                      00176                 ;en función de nlamp.
+                      00177                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00178                 ;nlamp >= 2?
+                      00179 
+0032   0826           00180                 movf nlamp,0
+0033   3C02           00181                 sublw 2
+0034   1903           00182                 btfsc 3,2
+0035   2838           00183                 goto menor              ;nlamp = 2
+0036   1C03           00184                 btfss 3,0               ;pregunta por carry, es >< 2
+0037   2843           00185                 goto mayor_2
+                      00186 
+                      00187                 ;carry = 1 ==> nlamp = < 2
+                      00188 
+0038   0826           00189 menor           movf nlamp,0
+0039   2061           00190                 call cod_act
+003A   3907           00191                 andlw 7         ;máscara para eliminar dato del puerto E
+003B   00AF           00192                 movwf temp
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+003C   1003           00193                 bcf 3,0                 ;limpia carry antes de rotar
+Message[305]: Using default destination of 1 (file).
+003D   0DAF           00194                 rlf temp
+Message[305]: Using default destination of 1 (file).
+003E   0DAF           00195                 rlf temp
+Message[305]: Using default destination of 1 (file).
+003F   0DAF           00196                 rlf temp                ;rota izq
+                      00197 
+                      00198                 ;trucaje para no afectar dato
+                      00199 
+0040   082F           00200                 movf temp,0             ;leo cod act
+0041   0587           00201                 andwf 7,1               ;sumo para no afectar
+0042   284D           00202                 goto dato
+                      00203 
+                      00204                 ;carry = 1 nlamp > 2
+                      00205 
+0043   0826           00206 mayor_2 movf nlamp,0
+0044   2061           00207                 call cod_act
+0045   01AF           00208                 clrf temp
+0046   00AF           00209                 movwf temp              ;respalda valor
+0047   1003           00210                 bcf 3,0                 ;limpia carry antes de rotar
+Message[305]: Using default destination of 1 (file).
+0048   0CAF           00211                 rrf temp
+Message[305]: Using default destination of 1 (file).
+0049   0CAF           00212                 rrf temp
+Message[305]: Using default destination of 1 (file).
+004A   0CAF           00213                 rrf temp
+004B   082F           00214                 movf temp,w             ;cod act al acum.
+004C   0089           00215                 movwf 9                 ;cod. de act al puerto E
+                      00216                 ;sacar el dato para la lámpara nlamp
+                      00217 
+004D   0826           00218 dato            movf nlamp,w
+004E   0784           00219                 addwf FSR,1                     
+004F   0800           00220                 movf INDF,0
+0050   2068           00221                 call cod_ss
+0051   0088           00222                 movwf 8
+                      00223                 ;comf 8
+                      00224 
+                      00225                 ;próxima  lámpara
+                      00226 
+0052   0826           00227                 movf nlamp,w
+0053   3C05           00228                 sublw 5
+0054   1D03           00229                 btfss 3,2
+0055   2858           00230                 goto menor_5
+                      00231 
+                      00232                 ;nlamp = 0
+                      00233 
+0056   01A6           00234                 clrf nlamp
+0057   2859           00235                 goto back_t0
+                      00236                 
+                      00237                 ;nlamp < 5
+                      00238 
+Message[305]: Using default destination of 1 (file).
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0058   0AA6           00239 menor_5 incf nlamp
+                      00240 
+0059   110B           00241 back_t0 bcf INTCON,2            ;limpia la bandera de INT del timer0
+                      00242 
+005A   0828           00243 back            movf fsr_temp,w
+005B   0084           00244                 movwf FSR               ;restituye FSR
+005C   0E29           00245                 swapf stat_temp,w
+005D   0083           00246                 movwf STATUS    ;restituye STATUS
+005E   0EA7           00247                 swapf wtemp,f
+005F   0E27           00248                 swapf wtemp,w   ;restituye W sin afectar las banderas del STATUS.
+                      00249                                         ;la instrucción "swapf   f ", no afecta el contenido del STATUS 
+                                            
+0060   0009           00250                 retfie                  ;retorno de la subrutina.
+                      00251 
+                      00252 ;*************************************************************************************************
+                      00253 ;tabla de códigos de activación (ánodo común)
+                      00254 
+0061   0782           00255 cod_act addwf PCL,1             ;suma el offset al acum.
+0062   34FE           00256                 retlw b'11111110'
+0063   34FD           00257                 retlw b'11111101'
+0064   34FB           00258                 retlw b'11111011'
+0065   34F7           00259                 retlw b'11110111'
+0066   34EF           00260                 retlw b'11101111'
+0067   34DF           00261                 retlw b'11011111'
+                      00262 ;**************************************************************************************************
+                      00263 ;tabla decodificadora de BCD a caracteres 7 SEGMENTO para ÁNODO COMÚN.
+                      00264 ;Si se trabajara códigos para CÁTODO se complementaría cualquier DATO que
+                      00265 ;deba salir ya sea hacia los comunes o hacia el BUS de Segmentos.
+                      00266 
+0068   0782           00267 cod_ss          addwf   PCL,1
+0069   34C0           00268                 retlw   0xc0                    ;"0"
+006A   34F9           00269                 retlw   0xf9                    ;"1"
+006B   34A4           00270                 retlw   0xa4                    ;"2"
+006C   34B0           00271                 retlw   0xb0                    ;"3"
+006D   3499           00272                 retlw   0x99                    ;"4"
+006E   3492           00273                 retlw   0x92                    ;"5"
+006F   3482           00274                 retlw   0x82                    ;"6"
+0070   34B8           00275                 retlw   0xb8                    ;"7"
+0071   3480           00276                 retlw   0x80                    ;"8"
+0072   3498           00277                 retlw   0x98                    ;"9"
+                      00278 ;*****************************************************************************************************
+                      00279 ;Subrutina de conteo ascendente (6 dígitos)
+                      00280 ;Usted debe diseñar la subrutina de conteo descendente.
+                      00281 
+0073                  00282 cuenta_up       ;-----------------------------------
+                      00283                 ;procesa L6
+Message[305]: Using default destination of 1 (file).
+0073   0AA5           00284                 incf l6
+0074   0825           00285                 movf l6,w
+0075   3C0A           00286                 sublw d'10'
+0076   1D03           00287                 btfss 3,2
+0077   0008           00288                 return          ;no incrementar dígito adyacente
+                      00289                 ;llego a 10
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0078   01A5           00290                 clrf l6
+                      00291                 ;-----------------------------------
+                      00292                 ;procesa L5
+Message[305]: Using default destination of 1 (file).
+0079   0AA4           00293                 incf l5
+007A   0824           00294                 movf l5,w
+007B   3C0A           00295                 sublw d'10'
+007C   1D03           00296                 btfss 3,2
+007D   0008           00297                 return          ;no incrementar dígito adyacente
+                      00298                 ;llego a 10
+007E   01A4           00299                 clrf l5
+                      00300                 ;-----------------------------------
+                      00301                 ;procesa L4
+Message[305]: Using default destination of 1 (file).
+007F   0AA3           00302                 incf l4
+0080   0823           00303                 movf l4,w
+0081   3C0A           00304                 sublw d'10'
+0082   1D03           00305                 btfss 3,2
+0083   0008           00306                 return          ;no incrementar dígito adyacente
+                      00307                 ;llego a 10
+0084   01A3           00308                 clrf l4
+                      00309                 ;-----------------------------------
+                      00310                 ;procesa L3
+Message[305]: Using default destination of 1 (file).
+0085   0AA2           00311                 incf l3
+0086   0822           00312                 movf l3,w
+0087   3C0A           00313                 sublw d'10'
+0088   1D03           00314                 btfss 3,2
+0089   0008           00315                 return          ;no incrementar dígito adyacente
+                      00316                 ;llego a 10
+008A   01A2           00317                 clrf l3
+                      00318                 ;-----------------------------------
+                      00319                 ;procesa L2
+Message[305]: Using default destination of 1 (file).
+008B   0AA1           00320                 incf l2
+008C   0821           00321                 movf l2,w
+008D   3C0A           00322                 sublw d'10'
+008E   1D03           00323                 btfss 3,2
+008F   0008           00324                 return          ;no incrementar dígito adyacente
+                      00325                 ;llego a 10
+0090   01A1           00326                 clrf l2
+                      00327                 ;-----------------------------------
+                      00328                 ;procesa L1
+Message[305]: Using default destination of 1 (file).
+0091   0AA0           00329                 incf l1
+0092   0820           00330                 movf l1,w
+0093   3C0A           00331                 sublw d'10'
+0094   1D03           00332                 btfss 3,2
+0095   0008           00333                 return          ;no incrementar dígito adyacente
+                      00334                 ;llego a 10
+0096   01A0           00335                 clrf l1
+0097   0008           00336                 return
+                      00337 ;*****************************************************************************************************
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00338 ;DEMORA DE 150 ms antirebote para leer el pulsante
+                      00339 ;*****************************************************************************************************
+0098   3064           00340 dem_150ms       movlw d'100'
+0099   00AE           00341                 movwf M
+009A   302C           00342                 movlw d'44'
+009B   00AD           00343                 movwf N
+009C   209E           00344                 call demora
+009D   0008           00345                 return
+                      00346 ;*****************************************************************************************************
+                      00347 ;subrutina de DEMORA paramétrica general
+                      00348 ;*****************************************************************************************************
+009E                  00349 demora  ;return
+009E   082D           00350                 movf N,w
+009F   00AA           00351                 movwf cont1
+00A0   00AB           00352                 movwf cont2
+00A1   082E           00353                 movf M,w
+00A2   00AC           00354                 movwf cont3
+Message[305]: Using default destination of 1 (file).
+00A3   0BAA           00355 loop            decfsz cont1
+00A4   28A3           00356                 goto loop
+00A5   082D           00357                 movf N,w
+00A6   00AA           00358                 movwf cont1
+Message[305]: Using default destination of 1 (file).
+00A7   0BAB           00359                 decfsz cont2
+00A8   28A3           00360                 goto loop
+00A9   082D           00361                 movf N,w
+00AA   00AB           00362                 movwf cont2
+Message[305]: Using default destination of 1 (file).
+00AB   0BAC           00363                 decfsz cont3
+00AC   28A3           00364                 goto loop
+                      00365                 ;fin del proceso
+00AD   0008           00366                 return
+                      00367 
+                      00368                 
+                      00369                 end
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE  9
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCS0                             00000006
+ADCS1                             00000007
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+BRGH                              00000002
+C                                 00000000
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CREN                              00000004
+CSRC                              00000007
+DC                                00000001
+EEADR                             0000010D
+EEADRH                            0000010F
+EECON1                            0000018C
+EECON2                            0000018D
+EEDATA                            0000010C
+EEDATH                            0000010E
+EEIE                              00000004
+EEIF                              00000004
+EEPGD                             00000007
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+IBF                               00000007
+IBOV                              00000005
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE 10
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+IT                                00000024
+M                                 0000002E
+N                                 0000002D
+NOT_BO                            00000000
+NOT_BOR                           00000000
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+PCFG0                             00000000
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+RBIE                              00000003
+RBIF                              00000000
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE 11
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+RX9                               00000006
+RX9D                              00000000
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+STATUS                            00000003
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISB                             00000086
+TRISC                             00000087
+TRISD                             00000088
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRMT                              00000001
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE 12
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+W                                 00000000
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_ALL                           00000FCF
+_CP_OFF                           00003FFF
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_HS_OSC                           00003FFE
+_LP_OSC                           00003FFC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_WRT_ENABLE_OFF                   00003DFF
+_WRT_ENABLE_ON                    00003FFF
+_XT_OSC                           00003FFD
+__16F871                          00000001
+back                              0000005A
+back_t0                           00000059
+cod_act                           00000061
+cod_ss                            00000068
+cont1                             0000002A
+cont2                             0000002B
+cont3                             0000002C
+cuenta_up                         00000073
+dato                              0000004D
+dem_150ms                         00000098
+demora                            0000009E
+fsr_temp                          00000028
+inicio                            00000005
+l1                                00000020
+l2                                00000021
+l3                                00000022
+l4                                00000023
+l5                                00000024
+l6                                00000025
+loop                              000000A3
+mayor_2                           00000043
+menor                             00000038
+menor_5                           00000058
+nlamp                             00000026
+refresh                           0000002B
+stat_temp                         00000029
+temp                              0000002F
+MPASM 03.90 Released                        CONT_ASC_AUTO.ASM   11-22-2007  12:24:29         PAGE 13
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+test                              0000001F
+wtemp                             00000027
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : X---XXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXX-- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   171
+Program Memory Words Free:  1877
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :    18 reported,     0 suppressed
+
+

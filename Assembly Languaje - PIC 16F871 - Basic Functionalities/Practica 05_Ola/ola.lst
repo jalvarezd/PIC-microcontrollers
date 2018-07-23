@@ -1,0 +1,665 @@
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001         list p=16f871
+                      00002         #include <p16f871.inc>
+                      00001         LIST
+                      00002 ; P16F871.INC  Standard Header File, Version 1.00    Microchip Technology, Inc.
+                      00306         LIST
+                      00003 ;Práctica 04 (Ejemplo). "DESPLAZAMIENTO EN OLA DE CARACTERES"
+                      00004 ;DISPLAYS: Ánodo Común.
+                      00005 ;Nota: Los Datos que aquí se visualizan están en Código 7 Segmento; por lo tanto no se necesita
+                      00006 ;implementar la decodificación.
+                      00007 
+                      00008 ;============================================================================
+                      00009 ;ZONA DE DECLARACIÓN DE SÍMBOLOS Y VARIABLES.
+                      00010 ;============================================================================
+                      00011 ;buffers de las lamparas. Aquí se almacena el dato que deberá visualizarse en
+                      00012 ;los displays (l1 ... l6). 
+                      00013 
+  00000020            00014 l1              equ     0x20
+  00000021            00015 l2              equ     0x21
+  00000022            00016 l3              equ     0x22
+  00000023            00017 l4              equ     0x23
+  00000024            00018 l5              equ     0x24
+  00000025            00019 l6              equ     0x25
+                      00020 
+                      00021 ;variables generales
+                      00022 
+  00000026            00023 nlamp           equ     0x26    ;número de la lámpara que esta siendo refrescada
+  00000027            00024 wtemp           equ     0x27    ;respaldo ac.
+  00000028            00025 fsr_temp        equ     0x28    ;respaldo temporal del FSR.
+  00000029            00026 cont1           equ     0x29    ;contadores para demora
+  0000002A            00027 cont2           equ     0x2a
+  0000002B            00028 cont3           equ     0x2b
+  0000002C            00029 stat_temp       equ     0x2c    ;variable para respaldar el registro STATUS durante la interrupción.
+                      00030 
+                      00031 ;parametros para demora
+                      00032 
+  0000002D            00033 N               equ     0x2d    ;factores de demora
+  0000002E            00034 M               equ     0x2e    
+                      00035 
+                      00036 ;otras variables
+                      00037 
+  0000002F            00038 temp            equ     0x2f    ;varible temporal auxiliar.
+  00000030            00039 num_disp                equ     0x30    ;veces de conteo
+  00000031            00040 temp1           equ     0x31    ;varible temporal auxiliar.
+                      00041 
+                      00042 
+  00000004            00043 rs                      equ 4
+  00000000            00044 e                       equ 0
+                      00045 ;================================================================================
+                      00046 ;Definición de Vectores (Reset e Interrupción).
+                      00047 ;================================================================================
+                      00048 
+0000                  00049                         org 0
+0000   2805           00050                         goto inicio             ;vector de RESET.
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0004                  00051                         org 4
+0004   2830           00052                         goto IT                 ;vector de IT.
+                      00053 ;================================================================================
+                      00054 ;Bloque de Configuración del Hardware.
+                      00055 ;================================================================================
+0005   1283           00056 inicio                          bcf 3,5
+0006   1303           00057                         bcf 3,6                 ;banco 0
+                      00058                         ;==============================================================
+                      00059                         ;BLOQUE QUE DEFINE LAS CONDICIONES INICIALES DEL SISTEMA
+                      00060                         ;==============================================================
+                      00061                         ;inicia parámetros relativos a lamparas         
+                      00062 
+0007   01A6           00063                         clrf nlamp              ;inicia el contador de lámparas (nlamp) en la primera (l
+                            1)
+                      00064 
+                      00065                         ;carga valores de N y M para garantizar la demora deseada.
+                      00066 
+0008   3080           00067                         movlw d'128'
+0009   00AE           00068                         movwf M
+000A   301E           00069                         movlw d'30'
+000B   00AD           00070                         movwf N
+                      00071                         
+                      00072                         ;-------------------------------------------------------------------------------
+                            ------------------------------------    
+                      00073                         ;definicion de E/S
+                      00074                         ;modifica los registros TRIS (banco 1 de la RAM)
+                      00075 
+000C   1683           00076                         bsf 3,5                 ;banco 1
+                      00077 
+000D   0188           00078                         clrf 8                  ;Bus de Datos
+                      00079 
+000E   0189           00080                         clrf 9                  ;Puerto E salidas
+                      00081 
+000F   30C7           00082                         movlw b'11000111'       ;rc3, rc4 y rc5 salidas
+0010   0087           00083                         movwf 7
+                      00084 
+                      00085                         ;-------------------------------------------------------------------------------
+                            ------------------------------------    
+                      00086                         ;definición de líneas digitales
+                      00087         
+0011   3007           00088                         movlw 7         ;líneas del Puerto E DIGITALES
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0012   009F           00089                         movwf ADCON1
+                      00090                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+                      00091                         ;definición de parámetros para el tmr0
+                      00092                         ;tmr0 en modo timer, con pscaler / 64
+                      00093                         ;Ciclo de instrucción=0.25 US
+                      00094 
+0013   3004           00095                         movlw 4                 ;00000100, prescaler k = 4
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0014   0081           00096                         movwf OPTION_REG
+                      00097 
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00098                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+                      00099                         ;habilitación de la interrupción del TMR0 e Interrupciones Globales deshabilitad
+                            as
+                      00100                         ;(GIE = 0, T0IE = 0) por el momento.
+                      00101 
+0015   3020           00102                         movlw b'00100000'       ;11100000
+0016   008B           00103                         movwf 0x0b              ;int del tmr0 habilitada
+                      00104                         ;-------------------------------------------------------------------------------
+                            ------------------------------------                            
+0017   1283           00105                         bcf 3,5
+                      00106         
+                      00107 ;================================================================================
+                      00108 ;BLOQUE PRINCIPAL (PROGRAMA PRINCIPAL)
+                      00109 ;================================================================================
+                      00110 
+0018   0181           00111                         clrf TMR0               ;inicia timer 0
+0019   207A           00112                         call apaga              ;displays apagados al inicio.
+001A   178B           00113                         bsf INTCON,7            ;habilita todas las interrupciones.
+                      00114 
+                      00115 
+001B   2082           00116 last                    call demora             ;demora para que se observe la última
+                      00117                                                 ;lámpara
+001C   01B0           00118                         clrf num_disp
+001D   207A           00119                         call apaga              ;apaga displays
+001E   2082           00120                         call demora             ;demora para que se observe el apagado
+                      00121                                                 ;cuando termine cada ciclo.
+                      00122 
+001F   3020           00123 desplaza                movlw 0x20
+0020   0084           00124                         movwf FSR               ;inicia el FSR en la dirección de la RAM de Display
+                      00125                                                 ;de la primera lámpara (l1)
+0021   0830           00126                         movf num_disp,w
+0022   2073           00127                         call tab_char           ;tabla de caracteres que serán sacados
+0023   00B1           00128                         movwf temp1             ;respalda caracter
+0024   0830           00129                         movf num_disp,w
+0025   0784           00130                         addwf 4,1               ;direcciona display en donde se escribirá
+                      00131                                                 ;el caracter leído de la tabla
+0026   0831           00132                         movf temp1,w
+0027   0080           00133                         movwf 0         ;escribe caracter
+                      00134 
+                      00135                         ;¿Último display?
+                      00136 
+0028   0830           00137                         movf num_disp,w
+0029   3C05           00138                         sublw 5
+002A   1903           00139                         btfsc 3,2
+002B   281B           00140                         goto last               ;último display
+                      00141                         ;No es el último
+                      00142 
+Message[305]: Using default destination of 1 (file).
+002C   0AB0           00143                         incf num_disp
+002D   2082           00144                         call demora
+002E   281F           00145                         goto desplaza           
+                      00146 
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00147 
+002F   282F           00148 again                   goto again
+                      00149                         
+                      00150 
+                      00151 ;================================================================================
+                      00152 ;BLOQUE DE SUBRUTINAS
+                      00153 ;*******************************************************************************************************
+                            *************************
+                      00154 ;subrutina de Atención a Interrupción. Este caso incluye la decodificación de BCD a 7 segmentos
+                      00155 ;Atención al timer0, cada vez que se desborda; para refrescar el display cada 1ms.
+                      00156 ;*******************************************************************************************************
+                            *************************
+0030                  00157 IT              ;---------------------------------------------------------------------------------------
+                            ------------------      
+                      00158                 ;respaldo de registros.
+                      00159 
+0030   00A7           00160                 movwf wtemp     ;respaldo ac.
+0031   0E03           00161                 swapf STATUS,w
+0032   00AC           00162                 movwf stat_temp
+0033   0804           00163                 movf FSR,0
+0034   00A8           00164                 movwf fsr_temp  ;respaldo el FSR
+                      00165                 
+                      00166                 ;---------------------------------------------------------------------------------------
+                            ------------------      
+                      00167                 ;encuesta de banderas. 
+                      00168 
+0035   1D0B           00169                 btfss INTCON,2          ;T0IF =? 0
+0036   2864           00170                 goto back_t0    ;refresca el display
+                      00171 
+                      00172                 ;INT del timer 0: Rfrescar display.
+                      00173                 ;apaga lámparas al inicio.
+                      00174                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00175                 ;apaga comunes del puerto C
+0037   1587           00176 refresh         bsf PORTC,3
+0038   1607           00177                 bsf PORTC,4
+0039   1687           00178                 bsf PORTC,5
+                      00179                 ;apaga comunes del puerto E
+003A   30FF           00180                 movlw 0xff
+003B   0089           00181                 movwf 9
+                      00182 
+                      00183                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00184                 ;inicia el FSR  
+                      00185 
+003C   3020           00186                 movlw 0x20
+003D   0084           00187                 movwf FSR
+                      00188 
+                      00189                 ;chequea puerto de comunes (C ó E), en función de nlamp
+                      00190                 ;---------------------------------------------------------------------------------------
+                            ------------------
+                      00191                 ;nlamp >= 2?
+                      00192 
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+003E   0826           00193                 movf nlamp,0
+003F   3C02           00194                 sublw 2
+0040   1903           00195                 btfsc 3,2
+0041   2844           00196                 goto menor              ;nlamp = 2
+0042   1C03           00197                 btfss 3,0               ;pregunta por carry, es >< 2
+0043   284F           00198                 goto mayor_2
+                      00199 
+                      00200                 ;carry = 1 ==> nlamp = < 2
+                      00201 
+0044   0826           00202 menor           movf nlamp,0
+0045   206C           00203                 call cod_act
+0046   3907           00204                 andlw 7                 ;máscara para eliminar puerto E
+0047   00AF           00205                 movwf temp
+0048   1003           00206                 bcf 3,0                 ;limpia carry antes de rotar
+Message[305]: Using default destination of 1 (file).
+0049   0DAF           00207                 rlf temp
+Message[305]: Using default destination of 1 (file).
+004A   0DAF           00208                 rlf temp
+Message[305]: Using default destination of 1 (file).
+004B   0DAF           00209                 rlf temp                ;rota izq
+                      00210 
+                      00211                 ;trucaje para no afectar dato
+                      00212 
+004C   082F           00213                 movf temp,0             ;leo cod act
+004D   0587           00214                 andwf 7,1               ;sumo para no afectar
+004E   2859           00215                 goto dato
+                      00216 
+                      00217                 ;carry = 1 nlamp > 2
+                      00218 
+004F   0826           00219 mayor_2 movf nlamp,0
+0050   206C           00220                 call cod_act
+0051   01AF           00221                 clrf temp
+0052   00AF           00222                 movwf temp              ;respalda valor
+0053   1003           00223                 bcf 3,0                 ;limpia carry antes de rotar
+Message[305]: Using default destination of 1 (file).
+0054   0CAF           00224                 rrf temp
+Message[305]: Using default destination of 1 (file).
+0055   0CAF           00225                 rrf temp
+Message[305]: Using default destination of 1 (file).
+0056   0CAF           00226                 rrf temp
+0057   082F           00227                 movf temp,w             ;cod act al acum.
+0058   0089           00228                 movwf 9                 ;cod. de act al puerto E
+                      00229                 ;sacar el dato para la lámpara nlamp
+                      00230 
+0059   0826           00231 dato            movf nlamp,w
+005A   0784           00232                 addwf FSR,1                     
+005B   0800           00233                 movf INDF,0
+                      00234                 ;call cod_ss
+005C   0088           00235                 movwf 8
+                      00236 
+                      00237                 ;próxima  lámpara
+                      00238 
+005D   0826           00239                 movf nlamp,w
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+005E   3C05           00240                 sublw 5
+005F   1D03           00241                 btfss 3,2
+0060   2863           00242                 goto menor_5
+                      00243 
+                      00244                 ;nlamp = 0
+                      00245 
+0061   01A6           00246                 clrf nlamp
+0062   2864           00247                 goto back_t0
+                      00248                 
+                      00249                 ;nlamp < 5
+                      00250 
+Message[305]: Using default destination of 1 (file).
+0063   0AA6           00251 menor_5 incf nlamp
+                      00252 
+0064   110B           00253 back_t0 bcf INTCON,2            ;limpia la bandera del timer0
+                      00254 
+0065   0828           00255 back            movf fsr_temp,w
+0066   0084           00256                 movwf FSR               ;restituye FSR
+0067   0E2C           00257                 swapf stat_temp,w
+0068   0083           00258                 movwf STATUS    ;restituye STATUS
+0069   0EA7           00259                 swapf wtemp,f
+006A   0E27           00260                 swapf wtemp,w   ;restituye W sin afectar las banderas del STATUS.
+                      00261                                                         ;la instrucción "swapf   f ", no afecta el conte
+                            nido del STATUS                 
+006B   0009           00262                 retfie                  ;retorno de la subrutina.
+                      00263 
+                      00264 ;*******************************************************************************************************
+                            *************************
+                      00265 ;tabla de códigos de activación (ánodo común)
+                      00266 
+006C   0782           00267 cod_act addwf PCL,1             ;suma el offset al acum.
+006D   34FE           00268                 retlw b'11111110'
+006E   34FD           00269                 retlw b'11111101'
+006F   34FB           00270                 retlw b'11111011'
+0070   34F7           00271                 retlw b'11110111'
+0071   34EF           00272                 retlw b'11101111'
+0072   34DF           00273                 retlw b'11011111'
+                      00274 ;*******************************************************************************************************
+                            *************************
+                      00275 ;tabla auxiliar de códigos 7 segmentos
+                      00276 
+0073   0782           00277 tab_char        addwf PCL,1             ;suma el offset al acum.
+0074   34A3           00278                 retlw 0xa3
+0075   349C           00279                 retlw 0x9c
+0076   34A3           00280                 retlw 0xa3
+0077   349C           00281                 retlw 0x9c
+0078   34A3           00282                 retlw 0xa3
+0079   349C           00283                 retlw 0x9c
+                      00284 
+                      00285 
+                      00286 ;*******************************************************************************************************
+                            ****************
+                      00287 ;apaga displays
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00288 
+007A   30FF           00289 apaga           movlw 0xff
+007B   00A0           00290                 movwf l1
+007C   00A1           00291                 movwf l2
+007D   00A2           00292                 movwf l3
+007E   00A3           00293                 movwf l4
+007F   00A4           00294                 movwf l5
+0080   00A5           00295                 movwf l6
+0081   0008           00296                 return
+                      00297 ;*******************************************************************************************************
+                            ****************
+                      00298 ;subrutina de DEMORA paramétrica general
+                      00299 ;*******************************************************************************************************
+                            ****************
+0082                  00300 demora  ;return
+0082   082D           00301                 movf N,w
+0083   00A9           00302                 movwf cont1
+0084   00AA           00303                 movwf cont2
+0085   082E           00304                 movf M,w
+0086   00AB           00305                 movwf cont3
+Message[305]: Using default destination of 1 (file).
+0087   0BA9           00306 loop            decfsz cont1
+0088   2887           00307                 goto loop
+0089   082D           00308                 movf N,w
+008A   00A9           00309                 movwf cont1
+Message[305]: Using default destination of 1 (file).
+008B   0BAA           00310                 decfsz cont2
+008C   2887           00311                 goto loop
+008D   082D           00312                 movf N,w
+008E   00AA           00313                 movwf cont2
+Message[305]: Using default destination of 1 (file).
+008F   0BAB           00314                 decfsz cont3
+0090   2887           00315                 goto loop
+                      00316                 ;fin del proceso
+0091   0008           00317                 return
+                      00318                 
+                      00319                 end
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  8
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCS0                             00000006
+ADCS1                             00000007
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+BRGH                              00000002
+C                                 00000000
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CREN                              00000004
+CSRC                              00000007
+DC                                00000001
+EEADR                             0000010D
+EEADRH                            0000010F
+EECON1                            0000018C
+EECON2                            0000018D
+EEDATA                            0000010C
+EEDATH                            0000010E
+EEIE                              00000004
+EEIF                              00000004
+EEPGD                             00000007
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+IBF                               00000007
+IBOV                              00000005
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE  9
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+IT                                00000030
+M                                 0000002E
+N                                 0000002D
+NOT_BO                            00000000
+NOT_BOR                           00000000
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+PCFG0                             00000000
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+RBIE                              00000003
+RBIF                              00000000
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE 10
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+RX9                               00000006
+RX9D                              00000000
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+STATUS                            00000003
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISB                             00000086
+TRISC                             00000087
+TRISD                             00000088
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRMT                              00000001
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE 11
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+W                                 00000000
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_ALL                           00000FCF
+_CP_OFF                           00003FFF
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_HS_OSC                           00003FFE
+_LP_OSC                           00003FFC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_WRT_ENABLE_OFF                   00003DFF
+_WRT_ENABLE_ON                    00003FFF
+_XT_OSC                           00003FFD
+__16F871                          00000001
+again                             0000002F
+apaga                             0000007A
+back                              00000065
+back_t0                           00000064
+cod_act                           0000006C
+cont1                             00000029
+cont2                             0000002A
+cont3                             0000002B
+dato                              00000059
+demora                            00000082
+desplaza                          0000001F
+e                                 00000000
+fsr_temp                          00000028
+inicio                            00000005
+l1                                00000020
+l2                                00000021
+l3                                00000022
+l4                                00000023
+l5                                00000024
+l6                                00000025
+last                              0000001B
+loop                              00000087
+mayor_2                           0000004F
+menor                             00000044
+menor_5                           00000063
+nlamp                             00000026
+num_disp                          00000030
+MPASM 03.90 Released                                  OLA.ASM   11-23-2007  9:27:01         PAGE 12
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+refresh                           00000037
+rs                                00000004
+stat_temp                         0000002C
+tab_char                          00000073
+temp                              0000002F
+temp1                             00000031
+wtemp                             00000027
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : X---XXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XX-------------- ---------------- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   143
+Program Memory Words Free:  1905
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :    13 reported,     0 suppressed
+
+
